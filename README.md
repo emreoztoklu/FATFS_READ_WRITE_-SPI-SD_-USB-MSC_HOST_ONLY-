@@ -11,10 +11,10 @@ This file is about How to read files data on USB over STM32F407 Discovery Kit
   - retarget folder fir (printf and scanf functions)
   - Debug Test: used UART3  
  
-<p>SD : fresult: (0) Succeeded
-<p>SD : CARD size is calculating 
-<p>SD : total size is : 7.89 GB 
-<p>SD : Free Space is : 7.89 GB 
+<p>SD : fresult: (0) Succeeded</p>
+<p>SD : CARD size is calculating </p>
+<p>SD : total size is : 7.89 GB </p>
+<p>SD : Free Space is : 7.89 GB </p>
 <p>Dir: ERA
 
 <p>1://ERA/emre.txt size:0 KB 
