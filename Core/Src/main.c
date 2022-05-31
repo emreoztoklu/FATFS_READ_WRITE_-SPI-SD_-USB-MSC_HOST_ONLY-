@@ -40,7 +40,7 @@
 
 #define APP_VERSION_MAX 	0x1U
 #define APP_VERSION_MIN 	0x0U
-#define APP_VERSION_SMIN 	0x0U
+#define APP_VERSION_SMIN 	0x1U
 
 #define __STM32F4xx_HAL_VERSION_MAIN   (0x01U) /*!< [31:24] main version */
 #define __STM32F4xx_HAL_VERSION_SUB1   (0x07U) /*!< [23:16] sub1 version */
@@ -76,7 +76,7 @@ int file_copy(const char * src_path, const char *dest_path);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 /*****************************************************************************************************************/
-
+DIR dir;
 
 /*USB*/
 extern ApplicationTypeDef Appli_state;
@@ -107,21 +107,28 @@ extern UINT SD_br, SD_bw;  		// File read/write count
 uint8_t usb_flag;			// 0 is pasive 1 is active
 uint8_t usb_wrflag;			// 0 is write 1 is read
 
-
 uint8_t sd_flag;			// 0 is pasive 1 is active
 uint8_t sd_wrflag;			// 0 is write 1 is read
 
 /*******************************************/
 
+char path_SD[30];
+char path_USB[30];
 
-const char *pathSD_name1 = {"1://sample.bin"};
-const char *pathSD_name2 = {"1://ses1.txt"};
-const char *pathSD_name3 = {"1://SDemre.txt"};
+void toggleinfoled(GPIO_TypeDef* Portx, uint16_t Portnumber, int delay){
+	int isOn;
+	int delay1;
 
-const char *pathUSB_name1 = {"0://USBERA/USBsample.bin"};
-const char *pathUSB_name2 = {"0://File1.txt"};
-const char *pathUSB_name3 = {"0://USBERA/USBemre.txt"};
+	isOn = !isOn;
 
+	if(isOn == TRUE)
+	  delay1 = delay;
+	else
+	  delay1 = delay;
+
+	HAL_GPIO_WritePin(Portx, Portnumber, isOn);
+	HAL_Delay(delay1);
+}
 
 /*
 to find the size of data in buffer
@@ -154,8 +161,7 @@ void bufclear(void){
 
 
 
-int main(void)
-{
+int main(void){
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -192,17 +198,21 @@ int main(void)
   printf("STM32F4xx_CMSIS_VERSION	: \"%d.%d.%d.%d\"\r\n", __STM32F4xx_CMSIS_VERSION_MAIN,__STM32F4xx_CMSIS_VERSION_SUB1,__STM32F4xx_CMSIS_VERSION_SUB2,__STM32F4xx_HAL_VERSION_RC);
 
 
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+
+
+
+  while (1){
     /* USER CODE END WHILE */
+		while(sd_flag){
+			toggleinfoled(LED1_GPIO_Port, LED1_Pin, 100);
+		}
+
 
 	  MX_USB_HOST_Process();
-
 
 	  if((Appli_state = APPLICATION_READY) && usb_flag){
 
@@ -210,13 +220,17 @@ int main(void)
 		  	Scan_USB(USBHPath);
 		  	printf("---------------------------------------------\r\n");
 
-		  	Read_File(pathUSB_name3);
-
-		  	printf("---------------------------------------------\r\n");
-		  	Format_USB();  // Dir altındaki ni silmez sadece 0:// altındaki dosyaları siler
-		  	Scan_USB(USBHPath);
-		  	printf("---------------------------------------------\r\n");
-
+/*
+		  	if(Create_Dir("0://ERA")){
+		  		printf(">USB:Directory already exist or Create Error!\r\n");
+		  	}else{
+		  		for(int i = 1; i<51;i++){
+		  			sprintf(path_USB,"0://ERA/ses_%d.txt",i);
+			  		file_copy("0://USBERA/USBemre.txt", path_USB);
+			  	  }
+		  	}
+*/
+		  	Read_File("0://ERA/ses_35.txt");
 
 		  	if(Mount_SD()){
 		  		HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
@@ -225,34 +239,27 @@ int main(void)
 		  		break;
 		  	}
 		  	else{
-
 		  	  /*Check free space*/
 		  	  Check_SDCARD_Details();
-		  	  Scan_SD(USERPath);			// USERPath is SD CARD
-		  	  printf("---------------------------------------------\r\n");
-		  	  Read_SD_File("1://ERA/emre.txt");
-		  	  printf("---------------------------------------------\r\n");
-
-/**************************************************************************/
 		  	  Format_SD();
 		  	  Scan_SD(USERPath);			// USERPath is SD CARD
-		  	  printf("---------------------------------------------\r\n");
-		  	  file_copy(pathUSB_name3, pathSD_name3);
-		  	  Scan_SD(USERPath);			// USERPath is SD CARD
-		  	  Read_SD_File(pathSD_name3);
-
 /**************************************************************************/
-
-
+		  	  printf("---------------------------------------------\r\n");
+		  	  for ( int i = 1; i<51;i++){
+		  		sprintf(path_USB,"0://ERA//ses_%d.txt",i);
+		  		sprintf(path_SD,"1://ses_%d.txt",i);
+		  		file_copy(path_USB, path_SD);
+		  	  }
+		  	  Read_File("1://ses_35.txt");
+/**************************************************************************/
 		  	  UnMount_SD();
 		  	}
-
-			  usb_flag = 0;
-			  //Unmount_USB();
+		  	Unmount_USB();
+		  	sd_flag = 1;
 	  }
-
     /* USER CODE BEGIN 3 */
   }
+
   /* USER CODE END 3 */
 }
 
@@ -301,18 +308,18 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
-int file_copy(const char * src_path, const char *dest_path){
+int file_copy(const char *src_path, const char *dest_path){
 	 if (f_stat (src_path, &USBHfno) != FR_OK){
 			printf ("\r\n>USB: ERROR!!! File does not exists\r\n");
 			return 1;
 	  }else{
-		  if(f_open(&USBHFile,src_path,FA_OPEN_EXISTING|FA_READ)!= FR_OK){
+		  if(f_open(&USBHFile,src_path,FA_OPEN_ALWAYS|FA_READ)!= FR_OK){
 			printf ("\r\n>USB: ERROR!!! File does not open\r\n");
-			return 1;;
+			return 1;
 		  }
 		  else{
-	  		  if(f_open(&USERFile,dest_path,FA_CREATE_ALWAYS|FA_WRITE)!= FR_OK){
-	  			printf ("\r\n >SD : ERROR!!! File can not Create/Write\r\n");
+	  		  if(f_open(&USERFile,dest_path,FA_OPEN_ALWAYS|FA_CREATE_ALWAYS|FA_READ|FA_WRITE)!= FR_OK){
+	  			printf ("\r\n >SD : ERROR!!! File can not Create/Write\r\n");			//1 bak
 	  			return 1;
 	  		  }
 	  		  else{

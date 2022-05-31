@@ -65,6 +65,8 @@ extern const char error_list[20][100];
  extern uint8_t usb_flag;				// 0 is pasive 1 is active
  extern uint8_t usb_wrflag;			// 0 is write 1 is read
 
+ extern uint8_t sd_flag;			// 0 is pasive 1 is active
+ extern uint8_t sd_wrflag;			// 0 is write 1 is read
  /*******************************************/
 
 /* USER CODE END 0 */
@@ -132,6 +134,7 @@ static void USBH_UserProcess  (USBH_HandleTypeDef *phost, uint8_t id)
 		   if(!Unmount_USB()){
   			   HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_RESET);
   			   usb_flag = 0;
+  			   sd_flag = 1;
 		   }
 
 		   break;
@@ -143,8 +146,8 @@ static void USBH_UserProcess  (USBH_HandleTypeDef *phost, uint8_t id)
 
   	  case HOST_USER_CONNECTION:
   		   if (!Mount_USB()){
-  			   HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_SET);
-  			  // usb_flag = 1;
+  			  HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_SET);
+  			 sd_flag = 0;
   		   }
   		 Appli_state = APPLICATION_START;
 

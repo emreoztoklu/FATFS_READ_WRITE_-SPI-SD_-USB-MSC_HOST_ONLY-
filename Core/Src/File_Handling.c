@@ -183,20 +183,7 @@ FRESULT Write_File (char *name, char *data){
 }
 
 
-void toggleinfoled(GPIO_TypeDef* Portx, uint16_t Portnumber, int delay){
-	int isOn;
-	int delay1;
 
-	isOn = !isOn;
-
-	if(isOn == TRUE)
-	  delay1 = delay;
-	else
-	  delay1 = delay;
-
-	HAL_GPIO_WritePin(Portx, Portnumber, isOn);
-	HAL_Delay(delay1);
-}
 
 
 FRESULT Read_File (char *name){
@@ -380,13 +367,19 @@ FRESULT Remove_File (char *name){
 }
 
 FRESULT Create_Dir (char *name){
-    if ((USB_fresult = f_mkdir(name)) == FR_OK){
-    	printf ("\r\n*%s* has been created successfully\r\n", name);
-    }
-    else{
-    	printf ("\r\nERROR No. %d in creating directory *%s*\r\n", USB_fresult,name);
-    }
-    return USB_fresult;
+
+	DIR dir;
+	if((USB_fresult = f_opendir(&dir, name)) != FR_OK){
+	    if ((USB_fresult = f_mkdir(name)) != FR_OK){
+			USB_fresult < 21 ? printf("\r\n>USB: Result: (%s) \r\n",error_list[USB_fresult]) : printf(">SD : fresult: %d \r\n", USB_fresult);
+	    	return USB_fresult;
+	    }
+	    else{
+	    	printf ("\r\n>USB:(%s) File created successfully\r\n", error_list[USB_fresult]);
+	    }
+	    return USB_fresult;
+	}
+	return USB_fresult;
 }
 
 void Check_USB_Details (void){
