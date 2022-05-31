@@ -3,6 +3,7 @@
 
 #include "main.h"
 
+
 #define SPI_TIMEOUT 100
 
 extern SPI_HandleTypeDef 	hspi1;
@@ -35,6 +36,9 @@ extern SPI_HandleTypeDef 	hspi1;
 #define CT_SDC		0x06		/* SD */
 #define CT_BLOCK	0x08		/* Block addressing */
 
+
+
+
 /* Functions */
 DSTATUS SD_disk_initialize (BYTE pdrv);
 DSTATUS SD_disk_status (BYTE pdrv);
@@ -42,5 +46,11 @@ DRESULT SD_disk_read (BYTE pdrv, BYTE* buff, DWORD sector, UINT count);
 DRESULT SD_disk_write (BYTE pdrv, const BYTE* buff, DWORD sector, UINT count);
 DRESULT SD_disk_ioctl (BYTE pdrv, BYTE cmd, void* buff);
 
+int Mount_SD (void);
+int UnMount_SD (void);
 
+FRESULT Scan_SD (const char*pat);
+FRESULT Read_SD_File (char *name);
+FRESULT Format_SD (void);
+void Check_SDCARD_Details (void);
 #endif

@@ -1,9 +1,3 @@
-/*
- * File_Handling_RTOS.c
- *
- *  Created on: 26-June-2020
- *      Author: Controllerstech.com
- */
 #include "stm32f4xx_hal.h"
 #include "File_Handling.h"
 
@@ -11,8 +5,8 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "STM_flash.h"
-#include <machine/endian.h>
+//#include "STM_flash.h"
+//#include <machine/endian.h>
 
 unsigned char buffer4[4];
 #define LITTLE_TO_BIG_ENDIAN(buff)   (buff[0] |(buff[1]<<8) | (buff[2]<<16) | (buff[3]<<24));
@@ -26,18 +20,21 @@ uint16_t NumObs = 0;
 
 
 /* ===============>>>>>>>> NO CHANGES AFTER THIS LINE ========================>>>>>>> */
+extern const char error_list[20][66];
+
+extern uint8_t retUSBH; /* Return value for USBH */
 extern char USBHPath[4];   /* USBH logical drive path */
 extern FATFS USBHFatFS;    /* File system object for USBH logical drive */
 extern FIL USBHFile;       /* File object for USBH */
 
 FILINFO USBHfno;
-FRESULT fresult;  // result
-UINT br, bw;  // File read/write count
+FRESULT USB_fresult;  // result
+UINT USB_br, USB_bw;  // File read/write count
 
 /**** capacity related *****/
 FATFS *pUSBHFatFS;
 DWORD fre_clust;
-uint32_t total, free_space;
+uint32_t USB_total, USB_free_space;
 
 /********************************************************************************/
 extern UART_HandleTypeDef huart3;
@@ -48,42 +45,47 @@ void Send_Uart (char *string){
 /********************************************************************************/
 
 int Mount_USB (void){
-	if ((fresult = f_mount(&USBHFatFS, USBHPath, 1)) != FR_OK){
-		printf ("ERROR!!! in mounting USB ...\r\n");
-		return 1;
-	}else{
-		printf("USB mounted successfully...\r\n");
-		return 0;
-	}
+	if ((USB_fresult = f_mount(&USBHFatFS, USBHPath, 0)) != FR_OK){
+		USB_fresult < 21 ? printf("\r\n>USB: Result: (%s) \r\n",error_list[USB_fresult]) : printf(">SD : fresult: %d \r\n", USB_fresult);
+		  HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_RESET);
+		  return 1;
+	  }
+	  else {
+		  printf("\r\n>USB:(%s) USB STICK MOUNTED!\r\n", error_list[USB_fresult]);
+		  HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_SET);
+		  return 0;
+	  }
 }
 
 int Unmount_USB (void){
-	if ((fresult = f_mount(NULL, USBHPath, 1)) == FR_OK){
-		printf("USB UNMOUNTED successfully...\r\n");
-		return 0;
-	}else{
-		printf("ERROR!!! in UNMOUNTING USB \r\n");
-		return 1;
-	}
+	if ((USB_fresult = f_mount(NULL, USBHPath, 1)) != FR_OK){
+		  USB_fresult < 21 ? printf("\r\n>USB: Result: (%s) \r\n",error_list[USB_fresult]) : printf(">SD : fresult: %d \r\n", USB_fresult);
+		  HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
+		  return 1;
+	  }
+	  else {
+		  HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_RESET);
+		  printf("\r\n>USB:(%s) USB STICK UNMOUNTED! \r\n", error_list[USB_fresult]);
+		  return 0;
+	  }
 }
 
 /* Start node to be scanned (***also used as work area***) */
 FRESULT Scan_USB (char* pat){
     DIR dir;
     UINT i;
-    char *path = malloc(100*sizeof (char));
+    char *path = malloc(50*sizeof (char));
     sprintf (path, "%s",pat);
 
     /* Open the directory */
-    if (( fresult = f_opendir(&dir, path)) == FR_OK){
-
+    if (( USB_fresult = f_opendir(&dir, path)) == FR_OK){
     	for (;;){
              /* Read a directory item */
-            if ((fresult = f_readdir(&dir, &USBHfno)) != FR_OK || USBHfno.fname[0] == 0)
+            if ((USB_fresult = f_readdir(&dir, &USBHfno)) != FR_OK || USBHfno.fname[0] == 0)
             	break;  /* Break on error or end of dir */
 
-            if (USBHfno.fattrib & AM_DIR)     /* It is a directory */
-            {
+            /* It is a directory */
+            if (USBHfno.fattrib & AM_DIR)     {
             	if (!(strcmp ("SYSTEM~1", USBHfno.fname)))
             		continue;
             	if (!(strcmp("System Volume Information", USBHfno.fname)))
@@ -96,102 +98,98 @@ FRESULT Scan_USB (char* pat){
                 sprintf(&path[i], "/%s", USBHfno.fname);
 
                 /* Enter the directory */
-                if ((fresult = Scan_USB(path)) != FR_OK)
+                if ((USB_fresult = Scan_USB(path)) != FR_OK)
                 	break;
                 path[i] = 0;
             }
             else{   /* It is a file. */
-
-               printf("\tFile: %s/%s  %d KB\r\n", path, USBHfno.fname,(int)USBHfno.fsize/1024);
-
+               printf("    %3dKB  File Name: \"%s/%s\"\r\n",(int)USBHfno.fsize/1024, path, USBHfno.fname);
             }
         }
         f_closedir(&dir);
     }
     free(path);
-    return fresult;
+    return USB_fresult;
 }
 
 /* Only supports removing files from home directory */
 FRESULT Format_USB (void){
     DIR dir;
-    char *path = malloc(20*sizeof (char));
-    sprintf (path, "%s","/");
+    char *path = malloc(30*sizeof (char));
+    sprintf (path, "%s",USBHPath);
 
-                           /* Open the directory */
-    if ((fresult = f_opendir(&dir, path)) == FR_OK) {
+    /* Open the directory */
+    if ((USB_fresult = f_opendir(&dir, path)) == FR_OK) {
         for (;;){
-                               /* Read a directory item */
-            if ((fresult = f_readdir(&dir, &USBHfno)) != FR_OK || USBHfno.fname[0] == 0)
+            /* Read a directory item */
+            if ((USB_fresult = f_readdir(&dir, &USBHfno)) != FR_OK || USBHfno.fname[0] == 0)
             	break;  /* Break on error or end of dir */
 
-            if (USBHfno.fattrib & AM_DIR)     /* It is a directory */
-            {
+            /* It is a directory */
+            if (USBHfno.fattrib & AM_DIR){
             	if (!(strcmp ("SYSTEM~1", USBHfno.fname)))
             		continue;
-
             	if (!(strcmp("System Volume Information", USBHfno.fname)))
             		continue;
-
-
-            	if ((fresult = f_unlink(USBHfno.fname)) == FR_DENIED) continue;
+            	if ((USB_fresult = f_unlink(USBHfno.fname)) == FR_DENIED)
+            		continue;
             }
-
-            else{   /* It is a file. */
-               fresult = f_unlink(USBHfno.fname);
+            /* It is a file. */
+            else{
+               sprintf(path,"%s/%s",USBHPath, USBHfno.fname);
+               USB_fresult = f_unlink(USBHfno.fname);
             }
         }
         f_closedir(&dir);
     }
     free(path);
-    return fresult;
+    return USB_fresult;
 }
 
 
 FRESULT Write_File (char *name, char *data){
 
 	/**** check whether the file exists or not ****/
-	if ((fresult = f_stat (name, &USBHfno)) != FR_OK){
+	if ((USB_fresult = f_stat (name, &USBHfno)) != FR_OK){
 		printf ("\r\nERROR!!! *%s* does not exists\r\n", name);
-	    return fresult;
+	    return USB_fresult;
 	}
 
 	else{
 	    /* Create a file with read write access and open it */
-	    if ((fresult = f_open(&USBHFile, name, FA_OPEN_EXISTING | FA_WRITE)) != FR_OK){
-	    	printf ("\r\nERROR!!! No. %d in opening file *%s*\r\n", fresult, name);
-	        return fresult;
+	    if ((USB_fresult = f_open(&USBHFile, name, FA_OPEN_EXISTING | FA_WRITE)) != FR_OK){
+	    	printf ("\r\nERROR!!! No. %d in opening file *%s*\r\n", USB_fresult, name);
+	        return USB_fresult;
 	    }
 
 	    else{
 	    	printf ("\r\nOpening file-->  *%s*  To WRITE data in it\r\n", name);
 
-	    	if ((fresult = f_write(&USBHFile, data, strlen(data), &bw)) != FR_OK){
-	    		printf ("\r\nERROR!!! No. %d while writing to the FILE *%s*\r\n", fresult, name);
+	    	if ((USB_fresult = f_write(&USBHFile, data, strlen(data), &USB_bw)) != FR_OK){
+	    		printf ("\r\nERROR!!! No. %d while writing to the FILE *%s*\r\n", USB_fresult, name);
 	    	}
 
 	    	/* Close file */
-	    	if ((fresult = f_close(&USBHFile)) != FR_OK){
-	    		printf ("\r\nERROR!!! No. %d in closing file *%s* after writing it\r\n", fresult, name);
+	    	if ((USB_fresult = f_close(&USBHFile)) != FR_OK){
+	    		printf ("\r\nERROR!!! No. %d in closing file *%s* after writing it\r\n", USB_fresult, name);
 	    	}
 
 	    	else{
 	    		printf ("\r\nFile *%s* is WRITTEN and CLOSED successfully\r\n", name);
 	    	}
 	    }
-	    return fresult;
+	    return USB_fresult;
 	}
 }
 
 
 void toggleinfoled(GPIO_TypeDef* Portx, uint16_t Portnumber, int delay){
-
 	int isOn;
 	int delay1;
 
 	isOn = !isOn;
 
-	if(isOn == 1)
+	if(isOn == TRUE)
 	  delay1 = delay;
 	else
 	  delay1 = delay;
@@ -204,19 +202,19 @@ void toggleinfoled(GPIO_TypeDef* Portx, uint16_t Portnumber, int delay){
 FRESULT Read_File (char *name){
 	/**** check whether the file exists or not ****/
 
-	if ((fresult = f_stat (name, &USBHfno)) != FR_OK){
-		printf("ERRROR!!! *%s* does not exists\r\n", name);
-	    return fresult;
+	if ((USB_fresult = f_stat (name, &USBHfno)) != FR_OK){
+		printf(">USB:ERRROR!!! *%s* does not exists\r\n", name);
+	    return USB_fresult;
 	}
 	else{
 /********************************************************************************/
 /* Open file to read */
-		if ((fresult = f_open(&USBHFile, name, FA_OPEN_ALWAYS|FA_READ)) != FR_OK){
-			printf("ERROR!!! No. %d in opening file *%s*\r\n", fresult, name);
-		    return fresult;
+		if ((USB_fresult = f_open(&USBHFile, name, FA_OPEN_ALWAYS|FA_READ)) != FR_OK){
+			printf(">USB:ERROR!!! No. %d in opening file *%s*\r\n", USB_fresult, name);
+		    return USB_fresult;
 		}
 		else {
-	    	printf ("Opening file-->  *%s*  To READ data from it\r\n", name);
+	    	printf (">USB:FILE OPENED => \"%s\" to READ data from this file\r\n", name);
 		}
 
 //char* bufferX = 0x080186A0;
@@ -227,31 +225,22 @@ FRESULT Read_File (char *name){
         BYTE byte_buffer[4096];
         BYTE *small_buffer;
 
-	    FRESULT fr;          /* FatFs function common result code */
-	    UINT br, bw;         /* File read/write count */
+	    if(f_size(&USBHFile) == 0 || f_size(&USBHFile) < sizeof(byte_buffer)){
+	    	printf(">USB:\"%s\" \tfile size: %d Byte INFO:\"not enough buffer size is %d byte\"\r\n", name, (int)f_size(&USBHFile), (int)4096);
+	    	printf(">USB:Dinamic Memory will be allocated Size:%d\r\n", (int)f_size(&USBHFile));
 
-	    uint32_t file_size = f_size(&USBHFile);
-
-
-	    if(file_size == 0 || file_size < sizeof(byte_buffer)){
-	    	printf("%s file size is : %d byte  ""not enough buffer size is %d byte""\r\n", name, (int)file_size, (int)4096);
-
-	    	if((small_buffer = (BYTE*)malloc(file_size*sizeof(BYTE))) == NULL){
-	    		printf("Dinamic Memory is not allocated\r\n");
-
+	    	if((small_buffer = (BYTE*)malloc(f_size(&USBHFile)*sizeof(BYTE))) == NULL){
+	    		printf(">USB:Dinamic Memory is not allocated\r\n");
 	    	}
 	    	else {
-		    	printf("Dinamic size is : %p \r\n", small_buffer);
-
-		    	while (&USBHFile != f_eof(&USBHFile)){
+		    	//printf(">USB:Dinamic address: %p \r\n", small_buffer);
+		    	while (!f_eof(&USBHFile)){
 		    		memset((void*)small_buffer, 0 , f_size(&USBHFile));
-					if((fresult = f_read(&USBHFile, small_buffer, file_size, &br)) != FR_OK){
-						printf("\r\n>USB : Read Error \r\n");
+					if((USB_fresult = f_read(&USBHFile, small_buffer, (int)f_size(&USBHFile), &USB_br)) != FR_OK){
+						printf("\r\n>USB:Read Error \r\n");
 						break;
 					}
-		    		if(!br) break;
-
-		    		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
+		    		if(!USB_br) break;
 		    		printf("\r\n");
 
 		    		for (int i = 0; i< f_size(&USBHFile); i++){
@@ -268,7 +257,6 @@ FRESULT Read_File (char *name){
 		    		}
 		    		memset((void*)small_buffer, 0 , f_size(&USBHFile));
 		    		free((void*)small_buffer);
-		    		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
 		    		printf("\r\n");
 		    	}
 	    	}
@@ -277,13 +265,11 @@ FRESULT Read_File (char *name){
 	    else{
 			int i ,k;
 			for (k = 0; k < f_size(&USBHFile)/sizeof(byte_buffer); k++){
-			  if((fresult = f_read(&USBHFile, byte_buffer, sizeof(byte_buffer), &br)) != FR_OK){
+			  if((USB_fresult = f_read(&USBHFile, byte_buffer, sizeof(byte_buffer), &USB_br)) != FR_OK){
 				  printf("\r\n>USB : Read Error \r\n");
 				  break;
 			  }
 
-			  //toggleinfoled(GPIOD, GPIO_PIN_13, 500);
-			  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
 
 			  /*V.1*/
 			  for(i = 0; i < sizeof(byte_buffer) ; i++){
@@ -301,119 +287,121 @@ FRESULT Read_File (char *name){
 			  }
 			  memset(byte_buffer, 0, sizeof(byte_buffer));
 			  f_lseek(&USBHFile, (k + 1) * 4096);
-			  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
-
 			}
 			printf("\r\n");
 	    }
 
 /********************************************************************************/
 /* Close file */
-		if ((fresult = f_close(&USBHFile)) != FR_OK){
-			printf ("\r\nERROR!!! No. %d in closing file *%s*\r\n", fresult, name);
+		if ((USB_fresult = f_close(&USBHFile)) != FR_OK){
+			printf ("\r\n>USB:ERROR!!! No. %d in closing file *%s*\r\n", USB_fresult, name);
 		}
 		else{
-			printf ("\r\nFile *%s* CLOSED successfully\r\n", name);
+			printf ("\r\n>USB:\"%s\" FILE CLOSED\r\n", name);
 		}
 
-	    return fresult;
+	    return USB_fresult;
 	}
 }
 
 
 FRESULT Create_File (char *name){
 
-	if ((fresult = f_stat (name, &USBHfno)) == FR_OK){
+	if ((USB_fresult = f_stat (name, &USBHfno)) == FR_OK){
 		printf ("\r\nERROR!!! *%s* already exists!!!!\n use Update_File \n\n",name);
-	    return fresult;
+	    return USB_fresult;
 	}
 	else{
-		if ((fresult = f_open(&USBHFile, name, FA_CREATE_ALWAYS|FA_READ|FA_WRITE)) != FR_OK){
-			printf ("\r\nERROR!!! No. %d in creating file *%s*\r\n", fresult, name);
-		    return fresult;
+		if ((USB_fresult = f_open(&USBHFile, name, FA_CREATE_ALWAYS|FA_READ|FA_WRITE)) != FR_OK){
+			printf ("\r\nERROR!!! No. %d in creating file *%s*\r\n", USB_fresult, name);
+		    return USB_fresult;
 		}else{
 			printf ("\r\n*%s* created successfully\n Now use Write_File to write data\r\n",name);
 		}
 
-		if ((fresult = f_close(&USBHFile)) != FR_OK){
-			printf ("\r\nERROR No. %d in closing file *%s*\r\n", fresult, name);
+		if ((USB_fresult = f_close(&USBHFile)) != FR_OK){
+			printf ("\r\nERROR No. %d in closing file *%s*\r\n", USB_fresult, name);
 		}else{
 			printf ("\r\nFile *%s* CLOSED successfully\r\n", name);
 		}
 	}
-    return fresult;
+    return USB_fresult;
 }
 
 FRESULT Update_File (char *name, char *data){
 
 	/**** check whether the file exists or not ****/
-	if ((fresult = f_stat (name, &USBHfno)) != FR_OK){
+	if ((USB_fresult = f_stat (name, &USBHfno)) != FR_OK){
 		printf ("\r\nERROR!!! *%s* does not exists\r\n", name);
-	    return fresult;
+	    return USB_fresult;
 	}
 	else{
 	/* Create a file with read write access and open it */
-	    if ((fresult = f_open(&USBHFile, name, FA_OPEN_APPEND | FA_WRITE)) != FR_OK){
-	    	printf ("\r\nERROR!!! No. %d in opening file *%s*\r\n", fresult, name);
-	        return fresult;
+	    if ((USB_fresult = f_open(&USBHFile, name, FA_OPEN_APPEND | FA_WRITE)) != FR_OK){
+	    	printf ("\r\nERROR!!! No. %d in opening file *%s*\r\n", USB_fresult, name);
+	        return USB_fresult;
 	    }
 
 	    else{
 			printf ("\r\nOpening file-->  *%s*  To UPDATE data in it\r\n", name);
 
 		/* Writing text */
-			if ((fresult = f_write(&USBHFile, data, strlen (data), &bw)) != FR_OK){
-				printf ("\r\nERROR!!! No. %d in writing file *%s*\r\n", fresult, name);
+			if ((USB_fresult = f_write(&USBHFile, data, strlen (data), &USB_bw)) != FR_OK){
+				printf ("\r\nERROR!!! No. %d in writing file *%s*\r\n", USB_fresult, name);
 			}else {
 				printf ("\r\n*%s* UPDATED successfully\r\n", name);
 			}
 
 		/* Close file */
-			if ((fresult = f_close(&USBHFile)) != FR_OK){
-				printf ("\r\nERROR!!! No. %d in closing file *%s*\r\n", fresult, name);
+			if ((USB_fresult = f_close(&USBHFile)) != FR_OK){
+				printf ("\r\nERROR!!! No. %d in closing file *%s*\r\n", USB_fresult, name);
 			}else {
 				printf ("\r\nFile *%s* CLOSED successfully\r\n", name);
 			}
 	    }
 	}
-    return fresult;
+    return USB_fresult;
 }
 
 FRESULT Remove_File (char *name){
 	/**** check whether the file exists or not ****/
-	if ((fresult = f_stat (name, &USBHfno)) != FR_OK){
+	if ((USB_fresult = f_stat (name, &USBHfno)) != FR_OK){
 		printf ("\r\nERROR!!! *%s* does not exists\r\n", name);
-		return fresult;
+		return USB_fresult;
 	}
 	else{
-		if ((fresult = f_unlink (name)) == FR_OK){
+		if ((USB_fresult = f_unlink (name)) == FR_OK){
 			printf ("\r\n*%s* has been removed successfully\r\n", name);
 		}else{
-			printf ("\r\nERROR No. %d in removing *%s*\r\n",fresult, name);
+			printf ("\r\nERROR No. %d in removing *%s*\r\n",USB_fresult, name);
 		}
 	}
-	return fresult;
+	return USB_fresult;
 }
 
 FRESULT Create_Dir (char *name){
-    if ((fresult = f_mkdir(name)) == FR_OK){
+    if ((USB_fresult = f_mkdir(name)) == FR_OK){
     	printf ("\r\n*%s* has been created successfully\r\n", name);
     }
     else{
-    	printf ("\r\nERROR No. %d in creating directory *%s*\r\n", fresult,name);
+    	printf ("\r\nERROR No. %d in creating directory *%s*\r\n", USB_fresult,name);
     }
-    return fresult;
+    return USB_fresult;
 }
 
 void Check_USB_Details (void){
     /* Check free space */
-    f_getfree(USBHPath, &fre_clust, &pUSBHFatFS);
+	if ((USB_fresult = f_getfree(USBHPath, &fre_clust, &pUSBHFatFS)) != FR_OK){
+		USB_fresult < 21 ? printf(">SD : fresult: %s \r\n",error_list[USB_fresult]) :
+				  printf(">SD : fresult: %d \r\n", USB_fresult);
+	}
+	else {
+	    USB_total = (uint32_t)((pUSBHFatFS->n_fatent - 2) * pUSBHFatFS->csize * 0.5);
+	    printf ("\r\n>USB:Total Size:%.2fMB\r\n",(float)((USB_total/1024)));
 
-    total = (uint32_t)((pUSBHFatFS->n_fatent - 2) * pUSBHFatFS->csize * 0.5);
-    printf ("\r\nUSB  Total Size: \t%d MB \r\n",(int)total/1024);
-
-    free_space = (uint32_t)(fre_clust * pUSBHFatFS->csize * 0.5);
-    printf ("USB Free Space: \t%d MB \r\n",(int)free_space/1024);
+	    USB_free_space = (uint32_t)(fre_clust * pUSBHFatFS->csize * 0.5);
+	    printf (">USB:Free Space:%.2fMB\r\n\r\n",(float)((USB_free_space/1024)));
+	}
 }
 
 

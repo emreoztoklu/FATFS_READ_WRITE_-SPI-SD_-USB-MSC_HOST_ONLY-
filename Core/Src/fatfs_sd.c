@@ -1,10 +1,10 @@
-#define TRUE  1
-#define FALSE 0
-#define bool BYTE
-
 #include "stm32f4xx_hal.h"
 #include "diskio.h"
+#include "fatfs.h"
 #include "fatfs_sd.h"
+
+
+#define bool BYTE
 
 uint16_t Timer1, Timer2;					/* 1ms Timer Counter */
 
@@ -12,41 +12,54 @@ static volatile DSTATUS Stat = STA_NOINIT;	/* Disk Status */
 static uint8_t CardType;                    /* Type 0:MMC, 1:SDC, 2:Block addressing */
 static uint8_t PowerFlag = 0;				/* Power flag */
 
+/* ===============>>>>>>>> NO CHANGES AFTER THIS LINE ========================>>>>>>> */
+extern const char error_list[20][66];
+
+
+extern uint8_t retUSER;    /* Return value for USER */
+extern char USERPath[4];   /* USER logical drive path */
+extern FATFS USERFatFS;    /* File system object for USER logical drive */
+extern FIL USERFile;       /* File object for USER */
+
+FILINFO SDfno;
+FRESULT SD_fresult;			/* FatFs function common result code */
+UINT SD_br, SD_bw;  		// File read/write count
+
+/**** capacity related *****/
+FATFS	*pSDFatfs;			// file system
+DWORD 	fre_clust;
+uint32_t SD_total_space, SD_free_space;
+
 /***************************************
  * SPI functions
  **************************************/
 
 /* slave select */
-static void SELECT(void)
-{
+static void SELECT(void){
 	HAL_GPIO_WritePin(SD_CS_PORT, SD_CS_PIN, GPIO_PIN_RESET);
 	HAL_Delay(1);
 }
 
 /* slave deselect */
-static void DESELECT(void)
-{
+static void DESELECT(void){
 	HAL_GPIO_WritePin(SD_CS_PORT, SD_CS_PIN, GPIO_PIN_SET);
 	HAL_Delay(1);
 }
 
 /* SPI transmit a byte */
-static void SPI_TxByte(uint8_t data)
-{
+static void SPI_TxByte(uint8_t data){
 	while(!__HAL_SPI_GET_FLAG(HSPI_SDCARD, SPI_FLAG_TXE));
 	HAL_SPI_Transmit(HSPI_SDCARD, &data, 1, SPI_TIMEOUT);
 }
 
 /* SPI transmit buffer */
-static void SPI_TxBuffer(uint8_t *buffer, uint16_t len)
-{
+static void SPI_TxBuffer(uint8_t *buffer, uint16_t len){
 	while(!__HAL_SPI_GET_FLAG(HSPI_SDCARD, SPI_FLAG_TXE));
 	HAL_SPI_Transmit(HSPI_SDCARD, buffer, len, SPI_TIMEOUT);
 }
 
 /* SPI receive a byte */
-static uint8_t SPI_RxByte(void)
-{
+static uint8_t SPI_RxByte(void){
 	uint8_t dummy, data;
 	dummy = 0xFF;
 
@@ -57,8 +70,7 @@ static uint8_t SPI_RxByte(void)
 }
 
 /* SPI receive a byte via pointer */
-static void SPI_RxBytePtr(uint8_t *buff)
-{
+static void SPI_RxBytePtr(uint8_t *buff){
 	*buff = SPI_RxByte();
 }
 
@@ -67,8 +79,7 @@ static void SPI_RxBytePtr(uint8_t *buff)
  **************************************/
 
 /* wait SD ready */
-static uint8_t SD_ReadyWait(void)
-{
+static uint8_t SD_ReadyWait(void){
 	uint8_t res;
 
 	/* timeout 500ms */
@@ -83,15 +94,13 @@ static uint8_t SD_ReadyWait(void)
 }
 
 /* power on */
-static void SD_PowerOn(void)
-{
+static void SD_PowerOn(void){
 	uint8_t args[6];
 	uint32_t cnt = 0x1FFF;
 
 	/* transmit bytes to wake up */
 	DESELECT();
-	for(int i = 0; i < 10; i++)
-	{
+	for(int i = 0; i < 10; i++){
 		SPI_TxByte(0xFF);
 	}
 
@@ -110,9 +119,7 @@ static void SD_PowerOn(void)
 
 	/* wait response */
 	while ((SPI_RxByte() != 0x01) && cnt)
-	{
 		cnt--;
-	}
 
 	DESELECT();
 	SPI_TxByte(0XFF);
@@ -121,20 +128,17 @@ static void SD_PowerOn(void)
 }
 
 /* power off */
-static void SD_PowerOff(void)
-{
+static void SD_PowerOff(void){
 	PowerFlag = 0;
 }
 
 /* check power flag */
-static uint8_t SD_CheckPower(void)
-{
+static uint8_t SD_CheckPower(void){
 	return PowerFlag;
 }
 
 /* receive data block */
-static bool SD_RxDataBlock(BYTE *buff, UINT len)
-{
+static bool SD_RxDataBlock(BYTE *buff, UINT len){
 	uint8_t token;
 
 	/* timeout 200ms */
@@ -183,8 +187,7 @@ static bool SD_TxDataBlock(const uint8_t *buff, BYTE token)
 		SPI_RxByte();
 
 		/* receive response */
-		while (i <= 64)
-		{
+		while (i <= 64){
 			resp = SPI_RxByte();
 
 			/* transmit 0x05 accepted */
@@ -246,6 +249,30 @@ static BYTE SD_SendCmd(BYTE cmd, uint32_t arg)
 /***************************************
  * user_diskio.c functions
  **************************************/
+
+int Mount_SD (void){
+	  if ((SD_fresult = f_mount(&USERFatFS, USERPath, 1)) != FR_OK){
+		  SD_fresult < 21 ? printf(">SD : fresult: (%s) \r\n",error_list[SD_fresult]) : printf(">SD : fresult: %d \r\n", SD_fresult);
+		  return 1;
+	  }
+	  else {
+		  printf("\r\n>SD :(%s) SD CARD MOUNTED! \r\n", error_list[SD_fresult]);
+		  return 0;
+	  }
+}
+
+int UnMount_SD (void){
+	/* Unmount SDCARD */
+	if(f_mount(NULL, USERPath, 1) != FR_OK){
+		SD_fresult < 21 ? printf(">SD : fresult: (%s) \r\n",error_list[SD_fresult]) : printf(">SD : fresult: %d \r\n", SD_fresult);
+		return 1;
+	}
+	else{
+		printf("\r\n>SD :(%s) SD CARD UNMOUNTED! \r\n", error_list[SD_fresult]);
+		return 0;
+	}
+}
+
 
 /* initialize SD */
 DSTATUS SD_disk_initialize(BYTE drv)
@@ -545,3 +572,213 @@ DRESULT SD_disk_ioctl(BYTE drv, BYTE ctrl, void *buff)
 
 	return res;
 }
+
+void Check_SDCARD_Details (void){
+	  /*Check free space*/
+	  if ((SD_fresult = f_getfree(USERPath, &fre_clust, &pSDFatfs)) != FR_OK){
+		  SD_fresult < 21 ? printf(">SD : fresult: %s \r\n",error_list[SD_fresult]) : printf(">SD : fresult: %d \r\n", SD_fresult);
+	  } else{
+		  SD_total_space = (uint32_t)((pSDFatfs->n_fatent - 2) * pSDFatfs->csize * 0.5);
+		  printf("\r\n>SD : Total Size: %.3fGB\r\n",(float)(SD_total_space/1024)/1024);
+
+		  SD_free_space = (uint32_t)(fre_clust * pSDFatfs->csize * 0.5 );
+		  printf(">SD : Free Space: %.3fGB\r\n",(float)(SD_free_space/1024)/1024);
+
+	  }
+
+
+}
+
+
+
+FRESULT Scan_SD (const char*pat){
+	/* Start node to be scanned (***also used as work area***) */
+
+	DIR dir;
+    UINT i;
+
+    /*Copy the pat to path*/
+    char *path = malloc(50*sizeof (char));
+    sprintf (path, "%s",pat);
+
+    /* Open the directory */
+    if ((SD_fresult = f_opendir(&dir, path)) == FR_OK){
+        for (;;) {
+        	/* Read a directory item */
+        	if ((SD_fresult = f_readdir(&dir, &SDfno)) != FR_OK || SDfno.fname[0] == 0)
+        			break;  /* Break on error or end of dir */
+
+        	if (SDfno.fattrib & AM_DIR) {   /* It is a directory */
+        		if (!(strcmp ("SYSTEM~1", SDfno.fname)))
+        		     continue;
+        		if (!(strcmp("System Volume Information", SDfno.fname)))
+        		     continue;
+
+            	printf("\r\n");
+            	printf(">SD:Dir: %s\r\n", SDfno.fname);
+
+        		i = strlen(path);
+                sprintf(&path[i], "/%s", SDfno.fname);
+
+                /* Enter the directory */
+                if ((SD_fresult = Scan_SD(path)) != FR_OK)
+                	break;
+                path[i] = 0;
+            }
+
+            else {  /* It is a file. */
+                printf("    %3dKB  File Name: \"%s/%s\"\r\n",(int)SDfno.fsize/1024, path, SDfno.fname);
+
+            }
+        }
+        f_closedir(&dir);
+    }
+    free(path);
+    return SD_fresult;
+}
+
+/* Only supports removing files from home directory */
+FRESULT Format_SD (void){
+    DIR dir;
+    char *path = malloc(20*sizeof (char));
+    sprintf (path, "%s",USERPath);
+
+    /* Open the directory */
+    if ((SD_fresult = f_opendir(&dir, path)) == FR_OK) {
+        for (;;){
+            /* Read a directory item */
+            if ((SD_fresult = f_readdir(&dir, &SDfno)) != FR_OK || SDfno.fname[0] == 0)
+            	break;  /* Break on error or end of dir */
+
+            /* It is a directory */
+            if (SDfno.fattrib & AM_DIR){
+            	if (!(strcmp ("SYSTEM~1", SDfno.fname)))
+            		continue;
+            	if (!(strcmp("System Volume Information", SDfno.fname)))
+            		continue;
+            	if ((SD_fresult = f_unlink(SDfno.fname)) == FR_DENIED)
+            		continue;
+            }
+            /* It is a file. */
+            else{
+               sprintf(path,"%s/%s",USERPath, SDfno.fname);
+               SD_fresult = f_unlink(path);
+            }
+        }
+        f_closedir(&dir);
+    }
+    free(path);
+    return SD_fresult;
+}
+
+
+
+FRESULT Read_SD_File (char *name){
+	/**** check whether the file exists or not ****/
+
+	if ((SD_fresult = f_stat (name, &SDfno)) != FR_OK){
+		printf(">SD:ERRROR!!! *%s* does not exists\r\n", name);
+	    return SD_fresult;
+	}
+	else{
+/********************************************************************************/
+/* Open file to read */
+		if ((SD_fresult = f_open(&USERFile, name, FA_OPEN_ALWAYS|FA_READ)) != FR_OK){
+			printf(">SD :ERROR!!! No. %d in opening file *%s*\r\n", SD_fresult, name);
+		    return SD_fresult;
+		}
+		else {
+	    	printf (">SD :FILE OPENED => \"%s\" to READ data from this file\r\n", name);
+		}
+
+//char* bufferX = 0x080186A0;
+/* Read data from the file
+   see the function details for the arguments */
+/********************************************************************************/
+
+        BYTE byte_buffer[4096];
+        BYTE *small_buffer;
+
+	    uint32_t file_size = f_size(&USERFile);
+
+
+	    if(file_size == 0 || file_size < sizeof(byte_buffer)){
+	    	printf(">SD :\"%s\"  file size: %d Byte INFO:\"not enough buffer size is %d byte\"\r\n", name, (int)file_size, (int)4096);
+	    	printf(">SD :Dinamic Memory will be allocated Size:%d\r\n", (int)file_size);
+
+	    	if((small_buffer = (BYTE*)malloc(file_size*sizeof(BYTE))) == NULL){
+	    		printf(">SD :Dinamic Memory is not allocated\r\n");
+
+	    	}
+	    	else {
+		    	printf(">SD :Dinamic address: %p \r\n", small_buffer);
+
+		    	while (!f_eof(&USERFile)){
+		    		memset((void*)small_buffer, 0 , f_size(&USERFile));
+					if((SD_fresult = f_read(&USERFile, small_buffer, file_size, &SD_br)) != FR_OK){
+						printf("\r\n>SD :Read Error \r\n");
+						break;
+					}
+		    		if(!SD_br) break;
+		    		printf("\r\n");
+
+		    		for (int i = 0; i< f_size(&USERFile); i++){
+		    			if(!i)
+		    				printf("%08X ", 0);
+
+		    			if(i){
+		    				printf(" ");
+		    				if(!(i % 16))
+		    					printf(" \r\n%08X ", i);
+		    			}
+		    			printf("%02X", *(BYTE*)(small_buffer + i));
+
+		    		}
+		    		memset((void*)small_buffer, 0 , f_size(&USERFile));
+		    		free((void*)small_buffer);
+		    		printf("\r\n");
+		    	}
+	    	}
+/*********************************************************************************/
+	    }
+	    else{
+			int i ,k;
+			for (k = 0; k < f_size(&USERFile)/sizeof(byte_buffer); k++){
+			  if((SD_fresult = f_read(&USERFile, byte_buffer, sizeof(byte_buffer), &SD_br)) != FR_OK){
+				  printf("\r\n>SD : Read Error \r\n");
+				  break;
+			  }
+
+			  /*V.1*/
+			  for(i = 0; i < sizeof(byte_buffer) ; i++){
+				  if(!k && !i)
+					  printf("%08X ", 0);
+				  	  //printf("%08X ", 15);
+				  if(k || i){
+					printf(" ");
+					if(!(i % 16)){
+						printf(" \r\n%08X ", i + (k*4096));
+					}
+				  }
+				  printf("%02X", *(BYTE*)(byte_buffer + i));
+
+			  }
+			  memset(byte_buffer, 0, sizeof(byte_buffer));
+			  f_lseek(&USERFile, (k + 1) * 4096);
+			}
+			printf("\r\n");
+	    }
+
+/********************************************************************************/
+/* Close file */
+		if ((SD_fresult = f_close(&USERFile)) != FR_OK){
+			printf ("\r\n>SD :ERROR!!! No. %d in closing file *%s*\r\n", SD_fresult, name);
+		}
+		else{
+			printf ("\r\n>SD :\"%s\" FILE CLOSED\r\n", name);
+		}
+
+	    return SD_fresult;
+	}
+}
+

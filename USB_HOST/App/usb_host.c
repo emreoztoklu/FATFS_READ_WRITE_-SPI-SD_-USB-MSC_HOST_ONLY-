@@ -30,6 +30,7 @@
 #include <string.h>
 #include <stdio.h>
 
+
 /* USER CODE END Includes */
 
 /* USER CODE BEGIN PV */
@@ -50,13 +51,21 @@ ApplicationTypeDef Appli_state = APPLICATION_IDLE;
  * -- Insert your variables declaration here --
  */
 /* USER CODE BEGIN 0 */
+extern const char error_list[20][100];
 
  FRESULT fresult;
  FILELIST_FileTypeDef FileList;
  WAVE_FormatTypeDef WaveFormat;
  FIL WavFile;
 
- char path[100];
+
+ /***/
+ /*******************************************/
+ /*Flags*/
+ extern uint8_t usb_flag;				// 0 is pasive 1 is active
+ extern uint8_t usb_wrflag;			// 0 is write 1 is read
+
+ /*******************************************/
 
 /* USER CODE END 0 */
 
@@ -119,41 +128,25 @@ static void USBH_UserProcess  (USBH_HandleTypeDef *phost, uint8_t id)
   		  break;
 
   	  case HOST_USER_DISCONNECTION:
-			Appli_state = APPLICATION_DISCONNECT;
-			Unmount_USB();
-			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
-			printf("There is no any FlashDisk\r\n");
+  		  Appli_state = APPLICATION_DISCONNECT;
+		   if(!Unmount_USB()){
+  			   HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_RESET);
+  			   usb_flag = 0;
+		   }
 
-  		  break;
+		   break;
 
   	  case HOST_USER_CLASS_ACTIVE:
-  		  Appli_state = APPLICATION_READY;
-			 Mount_USB();
-			 HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
-			 Check_USB_Details();   // check space details
-
-			 while(1){
-				 Scan_USB(USBHPath);
-				 printf("-----------------------------\r\n");
-				 printf("Enter a any file name to read from exist files:\r\n");
-				 scanf("%s", path);
-				 printf("Enterence is : %s \r\n", path);
-				 HAL_Delay(300);
-
-
-				 Read_File(path);
-				 printf("-----------------------------\r\n");
-
-			 }
-
-  		  break;
+  		   Appli_state = APPLICATION_READY;
+  		   usb_flag = 1;
+		   break;
 
   	  case HOST_USER_CONNECTION:
-  		  Appli_state = APPLICATION_START;
-
-  		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_SET); // app ready
-  		  HAL_Delay(500);
-  		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
+  		   if (!Mount_USB()){
+  			   HAL_GPIO_WritePin(LED4_GPIO_Port, LED4_Pin, GPIO_PIN_SET);
+  			  // usb_flag = 1;
+  		   }
+  		 Appli_state = APPLICATION_START;
 
   		  break;
 

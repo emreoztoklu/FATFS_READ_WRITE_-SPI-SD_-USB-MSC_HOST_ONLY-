@@ -1,9 +1,3 @@
-/*
- * File_Handling_RTOS.h
- *
- *  Created on: 30-April-2020
- *      Author: Controllerstech
- */
 
 #ifndef FILE_HANDLING_H_
 #define FILE_HANDLING_H_
