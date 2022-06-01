@@ -697,16 +697,14 @@ FRESULT Read_SD_File (char *name){
 /* Read data from the file
    see the function details for the arguments */
 /********************************************************************************/
-
-        BYTE byte_buffer[4096];
-        BYTE *small_buffer;
+		#define BUFFER_SIZE 4096
 
 	    uint32_t file_size = f_size(&USERFile);
 
-
-	    if(file_size == 0 || file_size < sizeof(byte_buffer)){
-	    	printf(">SD :\"%s\"  file size: %d Byte INFO:\"not enough buffer size is %d byte\"\r\n", name, (int)file_size, (int)4096);
+	    if(file_size == 0 || file_size < BUFFER_SIZE){
+	    	printf(">SD :\"%s\"  file size: %d Byte INFO:\"not enough buffer size is %d byte\"\r\n", name, (int)file_size, (int)BUFFER_SIZE);
 	    	printf(">SD :Dinamic Memory will be allocated Size:%d\r\n", (int)file_size);
+	    	BYTE *small_buffer;
 
 	    	if((small_buffer = (BYTE*)malloc(file_size*sizeof(BYTE))) == NULL){
 	    		printf(">SD :Dinamic Memory is not allocated\r\n");
@@ -722,7 +720,7 @@ FRESULT Read_SD_File (char *name){
 						break;
 					}
 		    		if(!SD_br) break;
-		    		printf("\r\n");
+		    		printf("\r\n**********************************************************\r\n");
 
 		    		for (int i = 0; i< f_size(&USERFile); i++){
 		    			if(!i)
@@ -738,39 +736,45 @@ FRESULT Read_SD_File (char *name){
 		    		}
 		    		memset((void*)small_buffer, 0 , f_size(&USERFile));
 		    		free((void*)small_buffer);
-		    		printf("\r\n");
+		    		printf("\r\n**********************************************************\r\n");
 		    	}
 	    	}
 /*********************************************************************************/
 	    }
 	    else{
-			int i ,k;
-			for (k = 0; k < f_size(&USERFile)/sizeof(byte_buffer); k++){
-			  if((SD_fresult = f_read(&USERFile, byte_buffer, sizeof(byte_buffer), &SD_br)) != FR_OK){
-				  printf("\r\n>SD : Read Error \r\n");
-				  break;
-			  }
+  		  	BYTE * pbuffer;
 
-			  /*V.1*/
-			  for(i = 0; i < sizeof(byte_buffer) ; i++){
-				  if(!k && !i)
-					  printf("%08X ", 0);
-				  	  //printf("%08X ", 15);
-				  if(k || i){
-					printf(" ");
-					if(!(i % 16)){
-						printf(" \r\n%08X ", i + (k*4096));
-					}
+  		    if((pbuffer = (BYTE*)malloc(BUFFER_SIZE*sizeof(BYTE))) == NULL){
+  		    	printf(">SD:Dinamic Memory is not allocated\r\n");
+  		    }
+  		    else{
+				int i ,k;
+				for (k = 0; k < f_size(&USERFile)/BUFFER_SIZE; k++){
+				  if((SD_fresult = f_read(&USERFile, pbuffer, BUFFER_SIZE, &SD_br)) != FR_OK){
+					  printf("\r\n>SD : Read Error \r\n");
+					  break;
 				  }
-				  printf("%02X", *(BYTE*)(byte_buffer + i));
 
-			  }
-			  memset(byte_buffer, 0, sizeof(byte_buffer));
-			  f_lseek(&USERFile, (k + 1) * 4096);
-			}
-			printf("\r\n");
+				  /*V.1*/
+				  for(i = 0; i < BUFFER_SIZE ; i++){
+					  if(!k && !i)
+						  printf("%08X ", 0);
+						  //printf("%08X ", 15);
+					  if(k || i){
+						printf(" ");
+						if(!(i % 16)){
+							printf(" \r\n%08X ", i + (k*BUFFER_SIZE));
+						}
+					  }
+					  printf("%02X", *(BYTE*)(pbuffer + i));
+				  }
+				  memset(pbuffer, 0, BUFFER_SIZE);
+				  f_lseek(&USERFile, (k + 1) * BUFFER_SIZE);
+				}
+				free((void*)pbuffer);
+				printf("\r\n");
+  		    }
 	    }
-
 /********************************************************************************/
 /* Close file */
 		if ((SD_fresult = f_close(&USERFile)) != FR_OK){

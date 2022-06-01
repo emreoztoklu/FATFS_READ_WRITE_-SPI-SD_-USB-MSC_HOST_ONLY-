@@ -40,12 +40,14 @@
 
 #define APP_VERSION_MAX 	(0x1U)
 #define APP_VERSION_MIN 	(0x0U)
-#define APP_VERSION_SMIN 	(0x2U)
+#define APP_VERSION_SMIN 	(0x3U)
 
 #define __STM32F4xx_HAL_VERSION_MAIN   (0x01U) /*!< [31:24] main version */
 #define __STM32F4xx_HAL_VERSION_SUB1   (0x07U) /*!< [23:16] sub1 version */
 #define __STM32F4xx_HAL_VERSION_SUB2   (0x0DU) /*!< [15:8]  sub2 version */
 
+
+#define BUFFER_SIZE 4096
 
 /* USER CODE END PTD */
 
@@ -80,17 +82,14 @@ void task_filecopy(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 /*****************************************************************************************************************/
-DIR dir;
+
 
 /*USB*/
 extern ApplicationTypeDef Appli_state;
 extern USBH_StatusTypeDef usb_status;
 extern USBH_HandleTypeDef hUsbHostFS;
 
-BYTE byte_buffer[4096];
-char char_buffer[2];
-BYTE *small_buffer;
-
+/***************************************/
 /*USB HANDLES*/
 extern uint8_t retUSBH; /* Return value for USBH */
 extern char USBHPath[4];   /* USBH logical drive path */
@@ -107,20 +106,18 @@ extern FIL USERFile;       /* File object for USER */
 extern FILINFO SDfno;
 extern UINT SD_br, SD_bw;  		// File read/write count
 
+/***************************************/
+char char_buffer[2];
 
-/*******************************************/
+char path_SD[20];
+char path_USB[20];
+/***************************************/
 /*Flags*/
 uint8_t usb_flag;			// 0 is pasive 1 is active
 uint8_t usb_wrflag;			// 0 is write 1 is read
 
 extern uint16_t Timer3;
 /*******************************************/
-
-char path_SD[20];
-char path_USB[20];
-
-
-
 /*
 to find the size of data in buffer
 int bufsize(char *buf){
@@ -139,9 +136,6 @@ void bufclear(void){
 		char_buffer[i]= '\0';
 }
 */
-
-
-
 /*****************************************************************************************************************/
 /* USER CODE END 0 */
 
@@ -183,11 +177,11 @@ int main(void){
   /* USER CODE BEGIN 2 */
 
   RetargetInit(&huart3);
-  printf("*******************ERA ELECTRONICS**********************\r\n");
+  printf("**********************************************************\r\n");
   printf("APPLICATION VERSION	: \"v%d.%d.%d\"\r\n", APP_VERSION_MAX,APP_VERSION_MIN,APP_VERSION_SMIN);
   printf("STM32F4xx_HAL_VERSION	: \"v%d.%d.%d\"\r\n", __STM32F4xx_HAL_VERSION_MAIN,__STM32F4xx_HAL_VERSION_SUB1,__STM32F4xx_HAL_VERSION_SUB2);
   printf("STM32F4xx_CMSIS_VERSION	: \"v%d.%d.%d\"\r\n", __STM32F4xx_CMSIS_VERSION_MAIN,__STM32F4xx_CMSIS_VERSION_SUB1,__STM32F4xx_CMSIS_VERSION_SUB2);
-  printf("*******************************************************\r\n");
+  printf("**********************************************************\r\n");
 
   /* USER CODE END 2 */
 
@@ -253,6 +247,9 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 void task_app(void){
 	if(hUsbHostFS.gState == HOST_IDLE && !Timer3){
+		printf("**********************************************************\r\n");
+		printf(">SYS_INFO: Application is running now\r\n");
+		printf("**********************************************************\r\n");
 		while(1){
 			toggleinfoled(LED1_GPIO_Port, LED1_Pin, 100);
 		}
@@ -262,52 +259,59 @@ void task_app(void){
 void task_filecopy(void){
 	  MX_USB_HOST_Process();
 	  if((Appli_state == APPLICATION_READY) && (hUsbHostFS.gState == HOST_CLASS) && (usb_status == USBH_OK)){
+		  printf("**********************************************************\r\n");
+		  printf(">SYS_INFO: Files will be copied from USB Driver \"0:\\\" to SD_CARD Driver \"1:\\\" \r\n");
+		  printf("**********************************************************\r\n");
 
-	  Check_USB_Details();   // check space details
-	  printf("---------------------------------------------\r\n");
-	  //Scan_USB(USBHPath);
+		  Check_USB_Details();   // check space details
+		  printf("\r\n");
+		  //Scan_USB(USBHPath);
 /*
-	  if(Create_Dir("0://ERA")){
-	  	printf(">USB:Directory already exist or Create Error!\r\n");
-	  }else{
-	  	for(int i = 1; i<51;i++){
-	  		sprintf(path_USB,"0://ERA/ses_%d.txt",i);
+	  	  if(Create_Dir("0://ERA")){
+	  		printf(">USB:Directory already exist or Create Error!\r\n");
+	  	  }else{
+	  		for(int i = 1; i<51;i++){
+	  			sprintf(path_USB,"0://ERA/ses_%d.txt",i);
 	    		file_copy("0://USBERA/USBemre.txt", path_USB);
 	    	  }
-	  		  	}
+	  		}
 */
-	  Read_File("0://ERA/ses_35.txt");
+		  Read_File("0://ERA/ses_35.txt");
 
-	  if(Mount_SD()){
-		  HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
-		  printf(">SD : There is no any SD CARD\r\n");
-		  Error_Handler();
-	  }
-	  else{
-	  /*Check free space*/
-		  Check_SDCARD_Details();
-		  Format_SD();
-/**************************************************************************/
-		  printf("---------------------------------------------\r\n");
-
-		  for ( int i = 1; i<51;i++){
-			  sprintf(path_USB,"0://ERA//ses_%d.txt",i);
-			  sprintf(path_SD,"1://ses_%d.txt",i);
-			  file_copy(path_USB, path_SD);
+		  if(Mount_SD()){
+			  HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
+			  printf(">SD : There is no any SD CARD\r\n");
+			  Error_Handler();
 		  }
-// Scan_SD(USERPath);				// USERPath is SD CARD
-		  Read_SD_File("1://ses_35.txt");
+		  else{
+			  /*Check free space*/
+			  Check_SDCARD_Details();
+			  printf("\r\n");
+			  Format_SD();
+/**************************************************************************/
+
+			  for ( int i = 1; i<51;i++){
+				  sprintf(path_USB,"0://ERA//ses_%d.txt",i);
+				  sprintf(path_SD,"1://ses_%d.txt",i);
+				  file_copy(path_USB, path_SD);
+				  Read_SD_File(path_SD);
+			  }
+			  // Scan_SD(USERPath);				// USERPath is SD CARD
+			  Read_SD_File("1://ses_35.txt");
 
 /**************************************************************************/
-	  	  UnMount_SD();
-	  	}
-	  	Unmount_USB();
-	  	hUsbHostFS.gState = HOST_IDLE;
+			  UnMount_SD();
+		  }
+		  Unmount_USB();
+		  printf("**********************************************************\r\n");
+		  printf("**********************************************************\r\n");
+		  hUsbHostFS.gState = HOST_IDLE;
   }
 }
 
 
 int file_copy(const char *src_path, const char *dest_path){
+
 	 if (f_stat (src_path, &USBHfno) != FR_OK){
 			printf ("\r\n>USB: ERROR!!! File does not exists\r\n");
 			return 1;
@@ -322,7 +326,10 @@ int file_copy(const char *src_path, const char *dest_path){
 	  			return 1;
 	  		  }
 	  		  else{
-	  		    if(f_size(&USBHFile) == 0 || f_size(&USBHFile) < sizeof(byte_buffer)){
+
+	  		    if(f_size(&USBHFile) == 0 || f_size(&USBHFile) < BUFFER_SIZE){
+	  		  	BYTE *small_buffer;
+
 	  		    	if((small_buffer = (BYTE*)malloc((int)f_size(&USBHFile)*sizeof(BYTE))) == NULL){
 	  		    		printf(">USB:Dinamic Memory is not allocated\r\n");
 	  		    	}
@@ -344,21 +351,28 @@ int file_copy(const char *src_path, const char *dest_path){
 	  			    	}
 	  		    	}
 	  		    }
+
 	  		    else{
-		  			for (int k = 0; k < f_size(&USBHFile)/sizeof(byte_buffer); k++){
-		  				if(f_read(&USBHFile, byte_buffer, sizeof(byte_buffer), &USB_br) != FR_OK){
-		  					printf(">SD :Read Error\r\n");
-		  					break;
-		  				}
+		  		  	BYTE * pbuffer;
+		  		    if((pbuffer = (BYTE*)malloc(BUFFER_SIZE*sizeof(BYTE))) == NULL){
+		  		    	printf(">USB:Dinamic Memory is not allocated\r\n");
+		  		    }
+		  		    else{
+				  		for (int k = 0; k < f_size(&USBHFile)/BUFFER_SIZE; k++){
+				  			if(f_read(&USBHFile, pbuffer, BUFFER_SIZE, &USB_br) != FR_OK){
+				  				printf(">SD :Read Error\r\n");
+				  				break;
+				  			}
 
-		  				for(int i = 0; i < sizeof(byte_buffer) ; i++){
-		  					sprintf(&char_buffer[0],"%c",*(BYTE*)(byte_buffer + i));
-		  					f_write(&USERFile,(const void *)&char_buffer[0], 1, &SD_br);
-		  				}
-		  				memset(byte_buffer, 0, sizeof(byte_buffer));
-		  				f_lseek(&USBHFile, (k + 1) * 4096);
-		  			}
-
+				  			for(int i = 0; i < BUFFER_SIZE ; i++){
+				  				sprintf(&char_buffer[0],"%c",*(BYTE*)(pbuffer + i));
+				  				f_write(&USERFile,(const void *)&char_buffer[0], 1, &SD_br);
+				  			}
+				  			memset(pbuffer, 0, BUFFER_SIZE);
+				  			f_lseek(&USBHFile, (k + 1) * BUFFER_SIZE);
+				  		}
+				  		free((void*)pbuffer);
+		  		    }
 	  		    }
 	  		 }
 		  }

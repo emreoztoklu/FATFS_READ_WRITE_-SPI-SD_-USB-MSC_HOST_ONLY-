@@ -208,19 +208,19 @@ FRESULT Read_File (char *name){
 /* Read data from the file
    see the function details for the arguments */
 /********************************************************************************/
+		#define BUFFER_SIZE 4096
 
-        BYTE byte_buffer[4096];
-        BYTE *small_buffer;
-
-	    if(f_size(&USBHFile) == 0 || f_size(&USBHFile) < sizeof(byte_buffer)){
-	    	printf(">USB:\"%s\" \tfile size: %d Byte INFO:\"not enough buffer size is %d byte\"\r\n", name, (int)f_size(&USBHFile), (int)4096);
+	    if(f_size(&USBHFile) == 0 || f_size(&USBHFile) < BUFFER_SIZE){
+	    	printf(">USB:\"%s\" \tfile size: %d Byte INFO:\"not enough buffer size is %d byte\"\r\n", name, (int)f_size(&USBHFile), (int)BUFFER_SIZE);
 	    	printf(">USB:Dinamic Memory will be allocated Size:%d\r\n", (int)f_size(&USBHFile));
+
+	    	BYTE *small_buffer;
 
 	    	if((small_buffer = (BYTE*)malloc(f_size(&USBHFile)*sizeof(BYTE))) == NULL){
 	    		printf(">USB:Dinamic Memory is not allocated\r\n");
 	    	}
 	    	else {
-		    	//printf(">USB:Dinamic address: %p \r\n", small_buffer);
+		    	printf(">USB:Dinamic address: %p \r\n", small_buffer);
 		    	while (!f_eof(&USBHFile)){
 		    		memset((void*)small_buffer, 0 , f_size(&USBHFile));
 					if((USB_fresult = f_read(&USBHFile, small_buffer, (int)f_size(&USBHFile), &USB_br)) != FR_OK){
@@ -228,7 +228,7 @@ FRESULT Read_File (char *name){
 						break;
 					}
 		    		if(!USB_br) break;
-		    		printf("\r\n");
+		    		printf("\r\n**********************************************************\r\n");
 
 		    		for (int i = 0; i< f_size(&USBHFile); i++){
 		    			if(!i)
@@ -244,38 +244,45 @@ FRESULT Read_File (char *name){
 		    		}
 		    		memset((void*)small_buffer, 0 , f_size(&USBHFile));
 		    		free((void*)small_buffer);
-		    		printf("\r\n");
+		    		printf("\r\n**********************************************************\r\n");
 		    	}
 	    	}
 /*********************************************************************************/
 	    }
 	    else{
-			int i ,k;
-			for (k = 0; k < f_size(&USBHFile)/sizeof(byte_buffer); k++){
-			  if((USB_fresult = f_read(&USBHFile, byte_buffer, sizeof(byte_buffer), &USB_br)) != FR_OK){
-				  printf("\r\n>USB : Read Error \r\n");
-				  break;
-			  }
 
+  		  	BYTE * pbuffer;
 
-			  /*V.1*/
-			  for(i = 0; i < sizeof(byte_buffer) ; i++){
-				  if(!k && !i)
-					  printf("%08X ", 0);
-				  	  //printf("%08X ", 15);
-				  if(k || i){
-					printf(" ");
-					if(!(i % 16)){
-						printf(" \r\n%08X ", i + (k*4096));
-					}
+  		    if((pbuffer = (BYTE*)malloc(BUFFER_SIZE*sizeof(BYTE))) == NULL){
+  		    	printf(">USB:Dinamic Memory is not allocated\r\n");
+  		    }
+  		    else{
+				int i ,k;
+				for (k = 0; k < f_size(&USBHFile)/BUFFER_SIZE; k++){
+				  if((USB_fresult = f_read(&USBHFile, pbuffer, BUFFER_SIZE, &USB_br)) != FR_OK){
+					  printf("\r\n>USB : Read Error \r\n");
+					  break;
 				  }
-				  printf("%02X", *(BYTE*)(byte_buffer + i));
 
-			  }
-			  memset(byte_buffer, 0, sizeof(byte_buffer));
-			  f_lseek(&USBHFile, (k + 1) * 4096);
-			}
-			printf("\r\n");
+				  /*V.1*/
+				  for(i = 0; i < BUFFER_SIZE ; i++){
+					  if(!k && !i)
+						  printf("%08X ", 0);
+						  //printf("%08X ", 15);
+					  if(k || i){
+						printf(" ");
+						if(!(i % 16)){
+							printf(" \r\n%08X ", i + (k*BUFFER_SIZE));
+						}
+					  }
+					  printf("%02X", *(BYTE*)(pbuffer + i));
+				  }
+				  memset(pbuffer, 0, BUFFER_SIZE);
+				  f_lseek(&USBHFile, (k + 1) * BUFFER_SIZE);
+				}
+				free((void*)pbuffer);
+				printf("\r\n");
+  		    }
 	    }
 
 /********************************************************************************/

@@ -1,0 +1,3 @@
+instead of byte byte buffer array 
+
+I have changed dinamic  pbuffer allocation.
