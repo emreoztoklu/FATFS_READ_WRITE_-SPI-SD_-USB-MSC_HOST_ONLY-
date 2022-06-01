@@ -38,14 +38,13 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
-#define APP_VERSION_MAX 	0x1U
-#define APP_VERSION_MIN 	0x0U
-#define APP_VERSION_SMIN 	0x2U
+#define APP_VERSION_MAX 	(0x1U)
+#define APP_VERSION_MIN 	(0x0U)
+#define APP_VERSION_SMIN 	(0x2U)
 
 #define __STM32F4xx_HAL_VERSION_MAIN   (0x01U) /*!< [31:24] main version */
 #define __STM32F4xx_HAL_VERSION_SUB1   (0x07U) /*!< [23:16] sub1 version */
 #define __STM32F4xx_HAL_VERSION_SUB2   (0x0DU) /*!< [15:8]  sub2 version */
-#define __STM32F4xx_HAL_VERSION_RC     (0x00U) /*!< [7:0]  release candidate */
 
 
 /* USER CODE END PTD */
@@ -70,7 +69,12 @@ void SystemClock_Config(void);
 void MX_USB_HOST_Process(void);
 
 /* USER CODE BEGIN PFP */
+void toggleinfoled(GPIO_TypeDef* Portx, uint16_t Portnumber, int delay);
 int file_copy(const char * src_path, const char *dest_path);
+
+void task_app(void);
+void task_filecopy(void);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -115,20 +119,7 @@ extern uint16_t Timer3;
 char path_SD[20];
 char path_USB[20];
 
-void toggleinfoled(GPIO_TypeDef* Portx, uint16_t Portnumber, int delay){
-	int isOn;
-	int delay1;
 
-	isOn = !isOn;
-
-	if(isOn == TRUE)
-	  delay1 = delay;
-	else
-	  delay1 = delay;
-
-	HAL_GPIO_WritePin(Portx, Portnumber, isOn);
-	HAL_Delay(delay1);
-}
 
 /*
 to find the size of data in buffer
@@ -204,68 +195,15 @@ int main(void){
   /* USER CODE BEGIN WHILE */
   Timer3 = 3000;			// if the USB is not mounted --check the condition 3sn then go your main loop
 
-
   while (1){
+
+		 task_app();
+		 task_filecopy();
+
     /* USER CODE END WHILE */
-
-	  MX_USB_HOST_Process();
-	  if((Appli_state == APPLICATION_READY) && (hUsbHostFS.gState == HOST_CLASS) && (usb_status == USBH_OK)){
-
-		  	Check_USB_Details();   // check space details
-		  	printf("---------------------------------------------\r\n");
-		  	//Scan_USB(USBHPath);
-
-/*
-		  	if(Create_Dir("0://ERA")){
-		  		printf(">USB:Directory already exist or Create Error!\r\n");
-		  	}else{
-		  		for(int i = 1; i<51;i++){
-		  			sprintf(path_USB,"0://ERA/ses_%d.txt",i);
-			  		file_copy("0://USBERA/USBemre.txt", path_USB);
-			  	  }
-		  	}
-*/
-		  	Read_File("0://ERA/ses_35.txt");
-
-		  	if(Mount_SD()){
-		  		HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
-		  		printf(">SD : There is no any SD CARD\r\n");
-		  		Error_Handler();
-		  		break;
-		  	}
-
-		  	else{
-		  	  /*Check free space*/
-		  	  Check_SDCARD_Details();
-		  	  Format_SD();
-/**************************************************************************/
-		  	  printf("---------------------------------------------\r\n");
-
-		  	  for ( int i = 1; i<51;i++){
-		  		sprintf(path_USB,"0://ERA//ses_%d.txt",i);
-		  		sprintf(path_SD,"1://ses_%d.txt",i);
-		  		file_copy(path_USB, path_SD);
-		  	  }
-
-		  // Scan_SD(USERPath);				// USERPath is SD CARD
-		  	  Read_SD_File("1://ses_35.txt");
-
-/**************************************************************************/
-		  	  UnMount_SD();
-		  	}
-		  	Unmount_USB();
-		  	hUsbHostFS.gState = HOST_IDLE;
-	  }
-
-	  if(hUsbHostFS.gState == HOST_IDLE && !Timer3){
-		while(1){
-			toggleinfoled(LED1_GPIO_Port, LED1_Pin, 100);
-		}
-	}
 
     /* USER CODE BEGIN 3 */
   }
-
   /* USER CODE END 3 */
 }
 
@@ -313,6 +251,61 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void task_app(void){
+	if(hUsbHostFS.gState == HOST_IDLE && !Timer3){
+		while(1){
+			toggleinfoled(LED1_GPIO_Port, LED1_Pin, 100);
+		}
+	}
+}
+
+void task_filecopy(void){
+	  MX_USB_HOST_Process();
+	  if((Appli_state == APPLICATION_READY) && (hUsbHostFS.gState == HOST_CLASS) && (usb_status == USBH_OK)){
+
+	  Check_USB_Details();   // check space details
+	  printf("---------------------------------------------\r\n");
+	  //Scan_USB(USBHPath);
+/*
+	  if(Create_Dir("0://ERA")){
+	  	printf(">USB:Directory already exist or Create Error!\r\n");
+	  }else{
+	  	for(int i = 1; i<51;i++){
+	  		sprintf(path_USB,"0://ERA/ses_%d.txt",i);
+	    		file_copy("0://USBERA/USBemre.txt", path_USB);
+	    	  }
+	  		  	}
+*/
+	  Read_File("0://ERA/ses_35.txt");
+
+	  if(Mount_SD()){
+		  HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
+		  printf(">SD : There is no any SD CARD\r\n");
+		  Error_Handler();
+	  }
+	  else{
+	  /*Check free space*/
+		  Check_SDCARD_Details();
+		  Format_SD();
+/**************************************************************************/
+		  printf("---------------------------------------------\r\n");
+
+		  for ( int i = 1; i<51;i++){
+			  sprintf(path_USB,"0://ERA//ses_%d.txt",i);
+			  sprintf(path_SD,"1://ses_%d.txt",i);
+			  file_copy(path_USB, path_SD);
+		  }
+// Scan_SD(USERPath);				// USERPath is SD CARD
+		  Read_SD_File("1://ses_35.txt");
+
+/**************************************************************************/
+	  	  UnMount_SD();
+	  	}
+	  	Unmount_USB();
+	  	hUsbHostFS.gState = HOST_IDLE;
+  }
+}
+
 
 int file_copy(const char *src_path, const char *dest_path){
 	 if (f_stat (src_path, &USBHfno) != FR_OK){
@@ -377,6 +370,21 @@ int file_copy(const char *src_path, const char *dest_path){
 	 return 0;
 }
 
+
+void toggleinfoled(GPIO_TypeDef* Portx, uint16_t Portnumber, int delay){
+	int isOn;
+	int delay1;
+
+	isOn = !isOn;
+
+	if(isOn == TRUE)
+	  delay1 = delay;
+	else
+	  delay1 = delay;
+
+	HAL_GPIO_WritePin(Portx, Portnumber, isOn);
+	HAL_Delay(delay1);
+}
 
 
 /* USER CODE END 4 */
