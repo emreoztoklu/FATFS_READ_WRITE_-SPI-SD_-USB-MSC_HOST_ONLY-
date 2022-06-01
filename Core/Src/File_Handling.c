@@ -390,10 +390,10 @@ void Check_USB_Details (void){
 	}
 	else {
 	    USB_total = (uint32_t)((pUSBHFatFS->n_fatent - 2) * pUSBHFatFS->csize * 0.5);
-	    printf ("\r\n>USB:Total Size:%.2fMB\r\n",(float)((USB_total/1024)));
+	    printf (">USB:Total Size:%.2fMB\r\n",(float)((USB_total/1024)));
 
 	    USB_free_space = (uint32_t)(fre_clust * pUSBHFatFS->csize * 0.5);
-	    printf (">USB:Free Space:%.2fMB\r\n\r\n",(float)((USB_free_space/1024)));
+	    printf (">USB:Free Space:%.2fMB\r\n",(float)((USB_free_space/1024)));
 	}
 }
 

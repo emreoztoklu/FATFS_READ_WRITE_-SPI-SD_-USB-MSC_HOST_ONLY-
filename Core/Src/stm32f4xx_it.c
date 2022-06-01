@@ -57,7 +57,8 @@
 /* External variables --------------------------------------------------------*/
 extern HCD_HandleTypeDef hhcd_USB_OTG_FS;
 /* USER CODE BEGIN EV */
-extern uint16_t Timer1, Timer2;
+extern uint16_t Timer1, Timer2, Timer3;
+
 
 void SDTimer_Handler(void){
   if(Timer1 > 0)
@@ -65,6 +66,9 @@ void SDTimer_Handler(void){
 
   if(Timer2 > 0)
     Timer2--;
+
+  if(Timer3 > 0)
+    Timer3--;
 }
 /* USER CODE END EV */
 

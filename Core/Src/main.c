@@ -40,7 +40,7 @@
 
 #define APP_VERSION_MAX 	0x1U
 #define APP_VERSION_MIN 	0x0U
-#define APP_VERSION_SMIN 	0x1U
+#define APP_VERSION_SMIN 	0x2U
 
 #define __STM32F4xx_HAL_VERSION_MAIN   (0x01U) /*!< [31:24] main version */
 #define __STM32F4xx_HAL_VERSION_SUB1   (0x07U) /*!< [23:16] sub1 version */
@@ -80,9 +80,11 @@ DIR dir;
 
 /*USB*/
 extern ApplicationTypeDef Appli_state;
+extern USBH_StatusTypeDef usb_status;
+extern USBH_HandleTypeDef hUsbHostFS;
 
 BYTE byte_buffer[4096];
-char char_buffer[5];
+char char_buffer[2];
 BYTE *small_buffer;
 
 /*USB HANDLES*/
@@ -107,13 +109,11 @@ extern UINT SD_br, SD_bw;  		// File read/write count
 uint8_t usb_flag;			// 0 is pasive 1 is active
 uint8_t usb_wrflag;			// 0 is write 1 is read
 
-uint8_t sd_flag;			// 0 is pasive 1 is active
-uint8_t sd_wrflag;			// 0 is write 1 is read
-
+extern uint16_t Timer3;
 /*******************************************/
 
-char path_SD[30];
-char path_USB[30];
+char path_SD[20];
+char path_USB[20];
 
 void toggleinfoled(GPIO_TypeDef* Portx, uint16_t Portnumber, int delay){
 	int isOn;
@@ -192,33 +192,28 @@ int main(void){
   /* USER CODE BEGIN 2 */
 
   RetargetInit(&huart3);
-
-  printf("APPLICATION VERSION	: \"%d.%d.%d\"\r\n", APP_VERSION_MAX,APP_VERSION_MIN,APP_VERSION_SMIN);
-  printf("STM32F4xx_HAL_VERSION	: \"%d.%d.%d\"\r\n", __STM32F4xx_HAL_VERSION_MAIN,__STM32F4xx_HAL_VERSION_SUB1,__STM32F4xx_HAL_VERSION_SUB2);
-  printf("STM32F4xx_CMSIS_VERSION	: \"%d.%d.%d.%d\"\r\n", __STM32F4xx_CMSIS_VERSION_MAIN,__STM32F4xx_CMSIS_VERSION_SUB1,__STM32F4xx_CMSIS_VERSION_SUB2,__STM32F4xx_HAL_VERSION_RC);
-
+  printf("*******************ERA ELECTRONICS**********************\r\n");
+  printf("APPLICATION VERSION	: \"v%d.%d.%d\"\r\n", APP_VERSION_MAX,APP_VERSION_MIN,APP_VERSION_SMIN);
+  printf("STM32F4xx_HAL_VERSION	: \"v%d.%d.%d\"\r\n", __STM32F4xx_HAL_VERSION_MAIN,__STM32F4xx_HAL_VERSION_SUB1,__STM32F4xx_HAL_VERSION_SUB2);
+  printf("STM32F4xx_CMSIS_VERSION	: \"v%d.%d.%d\"\r\n", __STM32F4xx_CMSIS_VERSION_MAIN,__STM32F4xx_CMSIS_VERSION_SUB1,__STM32F4xx_CMSIS_VERSION_SUB2);
+  printf("*******************************************************\r\n");
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
+  Timer3 = 3000;			// if the USB is not mounted --check the condition 3sn then go your main loop
 
 
   while (1){
     /* USER CODE END WHILE */
-		while(sd_flag){
-			toggleinfoled(LED1_GPIO_Port, LED1_Pin, 100);
-		}
-
 
 	  MX_USB_HOST_Process();
-
-	  if((Appli_state = APPLICATION_READY) && usb_flag){
+	  if((Appli_state == APPLICATION_READY) && (hUsbHostFS.gState == HOST_CLASS) && (usb_status == USBH_OK)){
 
 		  	Check_USB_Details();   // check space details
-		  	Scan_USB(USBHPath);
 		  	printf("---------------------------------------------\r\n");
+		  	//Scan_USB(USBHPath);
 
 /*
 		  	if(Create_Dir("0://ERA")){
@@ -238,25 +233,36 @@ int main(void){
 		  		Error_Handler();
 		  		break;
 		  	}
+
 		  	else{
 		  	  /*Check free space*/
 		  	  Check_SDCARD_Details();
 		  	  Format_SD();
-		  	  Scan_SD(USERPath);			// USERPath is SD CARD
 /**************************************************************************/
 		  	  printf("---------------------------------------------\r\n");
+
 		  	  for ( int i = 1; i<51;i++){
 		  		sprintf(path_USB,"0://ERA//ses_%d.txt",i);
 		  		sprintf(path_SD,"1://ses_%d.txt",i);
 		  		file_copy(path_USB, path_SD);
 		  	  }
-		  	  Read_File("1://ses_35.txt");
+
+		  // Scan_SD(USERPath);				// USERPath is SD CARD
+		  	  Read_SD_File("1://ses_35.txt");
+
 /**************************************************************************/
 		  	  UnMount_SD();
 		  	}
 		  	Unmount_USB();
-		  	sd_flag = 1;
+		  	hUsbHostFS.gState = HOST_IDLE;
 	  }
+
+	  if(hUsbHostFS.gState == HOST_IDLE && !Timer3){
+		while(1){
+			toggleinfoled(LED1_GPIO_Port, LED1_Pin, 100);
+		}
+	}
+
     /* USER CODE BEGIN 3 */
   }
 

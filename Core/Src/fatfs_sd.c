@@ -6,7 +6,9 @@
 
 #define bool BYTE
 
-uint16_t Timer1, Timer2;					/* 1ms Timer Counter */
+uint16_t Timer1, Timer2, Timer3;					/* 1ms Timer Counter */
+
+
 
 static volatile DSTATUS Stat = STA_NOINIT;	/* Disk Status */
 static uint8_t CardType;                    /* Type 0:MMC, 1:SDC, 2:Block addressing */
