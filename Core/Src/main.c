@@ -37,6 +37,12 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+/*This unique is own my board*/
+#define UNIQUEID_BASE_ADDRESS 0x1FFF7A10
+
+#define UNIQUEID_2   38363134
+#define UNIQUEID_1 	 34394701
+#define UNIQUEID_0   00310019
 
 #define APP_VERSION_MAX 	(0x1U)
 #define APP_VERSION_MIN 	(0x0U)
@@ -45,7 +51,6 @@
 #define __STM32F4xx_HAL_VERSION_MAIN   (0x01U) /*!< [31:24] main version */
 #define __STM32F4xx_HAL_VERSION_SUB1   (0x07U) /*!< [23:16] sub1 version */
 #define __STM32F4xx_HAL_VERSION_SUB2   (0x0DU) /*!< [15:8]  sub2 version */
-
 
 #define BUFFER_SIZE 4096
 
@@ -82,6 +87,24 @@ void task_filecopy(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 /*****************************************************************************************************************/
+/*UNIQUE ID */
+
+
+
+
+void write_uniqueID(void){
+
+	const uint32_t *unique_id = (uint32_t*)(UNIQUEID_BASE_ADDRESS);
+	printf("UNIQUE_CHIP_ID: %08X%08X%08X \r\n",unique_id[2], unique_id[1], unique_id[0]);
+
+	const uint32_t *unique_id1 = (uint32_t*)(UNIQUEID_BASE_ADDRESS);
+	const uint32_t *unique_id2 = (uint32_t*)(UNIQUEID_BASE_ADDRESS+4);
+	const uint32_t *unique_id3 = (uint32_t*)(UNIQUEID_BASE_ADDRESS+8);
+
+	printf("UNIQUE_CHIP_ID3: %08X\r\n", *unique_id3);
+	printf("UNIQUE_CHIP_ID2: %08X\r\n", *unique_id2);
+	printf("UNIQUE_CHIP_ID1: %08X\r\n", *unique_id1);
+}
 
 
 /*USB*/
@@ -178,16 +201,17 @@ int main(void){
 
   RetargetInit(&huart3);
   printf("**********************************************************\r\n");
-  printf("APPLICATION VERSION	: \"v%d.%d.%d\"\r\n", APP_VERSION_MAX,APP_VERSION_MIN,APP_VERSION_SMIN);
+  printf("APPLICATION_VERSION	: \"v%d.%d.%d\"\r\n", APP_VERSION_MAX,APP_VERSION_MIN,APP_VERSION_SMIN);
   printf("STM32F4xx_HAL_VERSION	: \"v%d.%d.%d\"\r\n", __STM32F4xx_HAL_VERSION_MAIN,__STM32F4xx_HAL_VERSION_SUB1,__STM32F4xx_HAL_VERSION_SUB2);
   printf("STM32F4xx_CMSIS_VERSION	: \"v%d.%d.%d\"\r\n", __STM32F4xx_CMSIS_VERSION_MAIN,__STM32F4xx_CMSIS_VERSION_SUB1,__STM32F4xx_CMSIS_VERSION_SUB2);
+  write_uniqueID();
   printf("**********************************************************\r\n");
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  Timer3 = 3000;			// if the USB is not mounted --check the condition 3sn then go your main loop
+  Timer3 = 3000;	// if the USB is not mounted --check the condition 3sn then go your main loop
 
   while (1){
 
@@ -266,7 +290,9 @@ void task_filecopy(void){
 		  Check_USB_Details();   // check space details
 		  printf("\r\n");
 		  //Scan_USB(USBHPath);
-/*
+
+
+/*  testing : Creating random files in USB
 	  	  if(Create_Dir("0://ERA")){
 	  		printf(">USB:Directory already exist or Create Error!\r\n");
 	  	  }else{
@@ -276,6 +302,8 @@ void task_filecopy(void){
 	    	  }
 	  		}
 */
+
+
 		  Read_File("0://ERA/ses_35.txt");
 
 		  if(Mount_SD()){
