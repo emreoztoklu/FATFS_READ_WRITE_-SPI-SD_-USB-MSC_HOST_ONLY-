@@ -289,12 +289,13 @@ void task_filecopy(void){
 
 		  Check_USB_Details();   // check space details
 		  printf("\r\n");
-		  //Scan_USB(USBHPath);
+		  Scan_USB(USBHPath);
 
-
-/*  testing : Creating random files in USB
-	  	  if(Create_Dir("0://ERA")){
-	  		printf(">USB:Directory already exist or Create Error!\r\n");
+		  /*
+  //testing : Creating random files in USB   _NOTE: Once you run this code keep back in comment &  rebuild it again the codes
+  // this comment code create random file
+	  	  if(Create_Dir("0://ERA")!=FR_OK){
+	  		 printf(">USB:Directory already exist or Create Error!\r\n");
 	  	  }else{
 	  		for(int i = 1; i<51;i++){
 	  			sprintf(path_USB,"0://ERA/ses_%d.txt",i);
@@ -302,8 +303,6 @@ void task_filecopy(void){
 	    	  }
 	  		}
 */
-
-
 		  Read_File("0://ERA/ses_35.txt");
 
 		  if(Mount_SD()){
@@ -322,9 +321,9 @@ void task_filecopy(void){
 				  sprintf(path_USB,"0://ERA//ses_%d.txt",i);
 				  sprintf(path_SD,"1://ses_%d.txt",i);
 				  file_copy(path_USB, path_SD);
-				  Read_SD_File(path_SD);
+				 Read_SD_File(path_SD);
 			  }
-			  // Scan_SD(USERPath);				// USERPath is SD CARD
+			   Scan_SD(USERPath);				// USERPath is SD CARD
 			  Read_SD_File("1://ses_35.txt");
 
 /**************************************************************************/

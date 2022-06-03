@@ -46,7 +46,7 @@ void Send_Uart (char *string){
 
 int Mount_USB (void){
 	if ((USB_fresult = f_mount(&USBHFatFS, USBHPath, 0)) != FR_OK){
-		USB_fresult < 21 ? printf("\r\n>USB: Result: (%s) \r\n",error_list[USB_fresult]) : printf(">SD : fresult: %d \r\n", USB_fresult);
+		USB_fresult < 21 ? printf("\r\n>USB: Result: (%s) \r\n",error_list[USB_fresult]) : printf(">USB: fresult: %d \r\n", USB_fresult);
 		  HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_RESET);
 		  return 1;
 	  }
@@ -59,7 +59,7 @@ int Mount_USB (void){
 
 int Unmount_USB (void){
 	if ((USB_fresult = f_mount(NULL, USBHPath, 1)) != FR_OK){
-		  USB_fresult < 21 ? printf("\r\n>USB: Result: (%s) \r\n",error_list[USB_fresult]) : printf(">SD : fresult: %d \r\n", USB_fresult);
+		  USB_fresult < 21 ? printf("\r\n>USB: Result: (%s) \r\n",error_list[USB_fresult]) : printf(">USB: fresult: %d \r\n", USB_fresult);
 		  HAL_GPIO_WritePin(LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET);
 		  return 1;
 	  }
@@ -378,7 +378,7 @@ FRESULT Create_Dir (char *name){
 	DIR dir;
 	if((USB_fresult = f_opendir(&dir, name)) != FR_OK){
 	    if ((USB_fresult = f_mkdir(name)) != FR_OK){
-			USB_fresult < 21 ? printf("\r\n>USB: Result: (%s) \r\n",error_list[USB_fresult]) : printf(">SD : fresult: %d \r\n", USB_fresult);
+			USB_fresult < 21 ? printf("\r\n>USB: Result: (%s) \r\n",error_list[USB_fresult]) : printf(">USB : fresult: %d \r\n", USB_fresult);
 	    	return USB_fresult;
 	    }
 	    else{
@@ -392,8 +392,8 @@ FRESULT Create_Dir (char *name){
 void Check_USB_Details (void){
     /* Check free space */
 	if ((USB_fresult = f_getfree(USBHPath, &fre_clust, &pUSBHFatFS)) != FR_OK){
-		USB_fresult < 21 ? printf(">SD : fresult: %s \r\n",error_list[USB_fresult]) :
-				  printf(">SD : fresult: %d \r\n", USB_fresult);
+		USB_fresult < 21 ? printf(">USB: fresult: %s \r\n",error_list[USB_fresult]) :
+				  printf(">USB: fresult: %d \r\n", USB_fresult);
 	}
 	else {
 	    USB_total = (uint32_t)((pUSBHFatFS->n_fatent - 2) * pUSBHFatFS->csize * 0.5);
